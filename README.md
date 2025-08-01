@@ -67,7 +67,7 @@ Currently, every file would need to be retrieved and written to disk manually.
  - CMake >=3.21
  - A C++17 compiler
 
-This project requires C++20. If you are stuck with an older version, you can use [Release v1.0.0](https://github.com/batterycenter/embed/releases/tag/v1.0.0). It was made for C++14.
+This project requires C++17. If you are stuck with an older version, you can use [Release v1.0.0](https://github.com/batterycenter/embed/releases/tag/v1.0.0). It was made for C++14.
 
 ## How it works
 
@@ -330,7 +330,7 @@ b_embed(MyTarget-resources resource2.txt)
 CMakeLists.txt:
 ```cmake
 add_executable(MyTarget)
-target_compile_features(MyTarget PUBLIC cxx_std_20)
+target_compile_features(MyTarget PUBLIC cxx_std_17)
 
 add_subdirectory(resources)
 ```
