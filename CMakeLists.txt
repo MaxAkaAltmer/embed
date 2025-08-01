@@ -192,13 +192,6 @@ set(EMBED_HEADER_FILE [=[
 #include <cstdint>
 #include <algorithm>
 
-// Отключаем проверку C++20 для совместимости
-#if 0
-#   ifndef __cpp_constexpr_dynamic_alloc
-#   error "battery::embed requires C++20 ..."
-#   endif
-#endif
-
 namespace b {
     struct EmbedInternal {
         class EmbeddedFile {
@@ -327,48 +320,40 @@ function(_embed_generate_hpp TARGET)
         return()
     endif()
 
-    # Генерация объявлений статических файлов
     set(EMBEDDED_FILES_DECLARATIONS "")
-    foreach (IDENTIFIER IN LISTS EMBED_IDENTIFIERS)
-        if (IDENTIFIER MATCHES "^${TARGET}_")
-            set(EMBEDDED_FILES_DECLARATIONS "${EMBEDDED_FILES_DECLARATIONS}static EmbeddedFile ${IDENTIFIER};\n")
-        endif()
-    endforeach()
-
-    # Генерация тела embed()
     set(EMBEDDED_FILES_RETURNS "")
+    set(EMBEDDED_FILES_LIST "")
+
+    # Проходим по индексам
     list(LENGTH EMBED_IDENTIFIERS num_identifiers)
-    foreach (INDEX RANGE ${num_identifiers})
+    foreach(INDEX RANGE ${num_identifiers})
         list(GET EMBED_IDENTIFIERS ${INDEX} IDENTIFIER)
         list(GET EMBED_FILENAMES ${INDEX} FILENAME)
         if (IDENTIFIER MATCHES "^${TARGET}_")
-            set(EMBEDDED_FILES_RETURNS "${EMBEDDED_FILES_RETURNS}if constexpr (identifier == \"${FILENAME}\") { return EmbedInternal::${IDENTIFIER}; }\nelse ")
-        endif()
-    endforeach()
+            # Объявление
+            set(EMBEDDED_FILES_DECLARATIONS "${EMBEDDED_FILES_DECLARATIONS}static EmbeddedFile ${IDENTIFIER};\n")
 
-    # Генерация списка имён файлов для embed_list()
-    set(EMBEDDED_FILES_LIST "")
-    foreach (IDENTIFIER IN LISTS EMBED_IDENTIFIERS)
-        list(GET EMBED_FILENAMES ${INDEX} FILENAME)
-        if (IDENTIFIER MATCHES "^${TARGET}_")
+            # Возврат в embed<>
+            set(EMBEDDED_FILES_RETURNS "${EMBEDDED_FILES_RETURNS}if constexpr (identifier == \"${FILENAME}\") { return EmbedInternal::${IDENTIFIER}; }\nelse ")
+
+            # Добавляем в список
             set(EMBEDDED_FILES_LIST "${EMBEDDED_FILES_LIST}    \"${FILENAME}\",\n")
         endif()
-        math(EXPR INDEX "${INDEX} + 1")
     endforeach()
 
-    # Удаляем последнюю запятую и перенос
+    # Убираем последнюю запятую
     string(REGEX REPLACE ",\n$" "" EMBEDDED_FILES_LIST "${EMBEDDED_FILES_LIST}")
 
-    # Подставляем всё в шаблон
+    # Генерируем заголовок
     file(READ ${EMBED_BINARY_DIR}/embed_header_file_template.hpp EMBED_HEADER_FILE)
     string(CONFIGURE "${EMBED_HEADER_FILE}" EMBED_HEADER_FILE_GENERATED)
 
-    # Записываем результат
+    # Путь к embed.hpp
     set(EMBED_HPP "${EMBED_BINARY_DIR}/autogen/${TARGET}/include/battery/embed.hpp")
     get_filename_component(EMBED_HPP_DIR "${EMBED_HPP}" DIRECTORY)
     file(MAKE_DIRECTORY "${EMBED_HPP_DIR}")
     file(WRITE "${EMBED_HPP}" "${EMBED_HEADER_FILE_GENERATED}")
-endfunction(_embed_generate_hpp)
+endfunction()
 
 # Internal function for validating an identifier
 function(embed_validate_identifier IDENTIFIER)  # Validate the identifier against C variable naming rules
@@ -381,51 +366,51 @@ endfunction()
 function(b_embed TARGET FILENAME)
     string(TOLOWER "${TARGET}" TARGET_ID)
     string(REGEX REPLACE "[^a-zA-Z0-9_]" "_" TARGET_ID "${TARGET_ID}")
-
     if (IS_ABSOLUTE "${FILENAME}")
         message(FATAL_ERROR "embed: File name must be relative to the current source directory: '${FILENAME}'")
     endif()
-
     # Make the identifier
     string(TOLOWER "${TARGET_ID}_${FILENAME}" IDENTIFIER)
     string(REGEX REPLACE "[^a-zA-Z0-9_]" "_" IDENTIFIER "${IDENTIFIER}") # Replace all invalid characters with underscores
     embed_validate_identifier("${IDENTIFIER}") # Validate the identifier against C variable naming rules
-
     # Set up paths
     get_filename_component(FULL_PATH "${FILENAME}" ABSOLUTE) # Make the file path absolute
     set(CPP_FILE "${EMBED_BINARY_DIR}/autogen/${TARGET_ID}/src/${IDENTIFIER}.cpp")
-
     # If identifier already in use
     list(FIND EMBED_IDENTIFIERS ${IDENTIFIER} EMBED_USED_IDENTIFIERS_INDEX)
     if (NOT EMBED_USED_IDENTIFIERS_INDEX EQUAL -1)
         message(FATAL_ERROR "embed: Identifier already in use: '${IDENTIFIER}'")
     endif()
-    set(EMBED_IDENTIFIERS ${EMBED_IDENTIFIERS} ${IDENTIFIER} CACHE INTERNAL "list of all identifiers used by the embed library")
-    set(EMBED_FILENAMES ${EMBED_FILENAMES} ${FILENAME} CACHE INTERNAL "list of all filenames used by the embed library")
-    set(EMBED_TARGETS ${EMBED_TARGETS} ${TARGET} CACHE INTERNAL "list of all targets used by the embed library")
+    # === Добавляем идентификатор и имя файла ===
+    set(EMBED_IDENTIFIERS ${EMBED_IDENTIFIERS} ${IDENTIFIER} CACHE INTERNAL "list of all identifiers used by the embed library" FORCE)
+    set(EMBED_FILENAMES ${EMBED_FILENAMES} ${FILENAME} CACHE INTERNAL "list of all filenames used by the embed library" FORCE)
+    set(EMBED_TARGETS ${EMBED_TARGETS} ${TARGET} CACHE INTERNAL "list of all targets used by the embed library" FORCE)
 
-    # This action generates both files and is called on-demand whenever the resource file changes
+    # === ГЕНЕРИРУЕМ embed.hpp СРАЗУ ДЛЯ ЭТОГО ТАРГЕТА ===
+    _embed_generate_hpp(${TARGET})
+
+    # === Генерация .cpp файла для встраивания ===
     set(EMBED_HPP "${EMBED_BINARY_DIR}/autogen/${TARGET_ID}/include/battery/embed.hpp")
     set(EMBED_CPP_TEMPLATE "${EMBED_BINARY_DIR}/embed_source_file_template.cpp")
     add_custom_command(
-            COMMAND ${CMAKE_COMMAND}
-                -DINFILE=${EMBED_CPP_TEMPLATE}
-                -DOUTFILE=${CPP_FILE}
-                -DFULL_PATH=${FULL_PATH}
-                -DIDENTIFIER=${IDENTIFIER}
-                -DFILENAME=${FILENAME}
-                -P "${EMBED_BINARY_DIR}/generate.cmake"
-            DEPENDS "${FULL_PATH}" "${EMBED_HPP}" "${EMBED_BINARY_DIR}/generate.cmake" "${EMBED_BINARY_DIR}/embed_source_file_template.cpp"
-            OUTPUT ${CPP_FILE}
-            VERBATIM
+        COMMAND ${CMAKE_COMMAND}
+            -DINFILE=${EMBED_CPP_TEMPLATE}
+            -DOUTFILE=${CPP_FILE}
+            -DFULL_PATH=${FULL_PATH}
+            -DIDENTIFIER=${IDENTIFIER}
+            -DFILENAME=${FILENAME}
+            -P "${EMBED_BINARY_DIR}/generate.cmake"
+        DEPENDS "${FULL_PATH}" "${EMBED_HPP}" "${EMBED_BINARY_DIR}/generate.cmake" "${EMBED_BINARY_DIR}/embed_source_file_template.cpp"
+        OUTPUT ${CPP_FILE}
+        VERBATIM
     )
 
-    # Add the generated files to the target
+    # === Добавляем файлы в таргет (теперь embed.hpp уже существует!) ===
     target_include_directories(${TARGET} PUBLIC 
         $<BUILD_INTERFACE:${EMBED_BINARY_DIR}/autogen/${TARGET_ID}/include>
         $<INSTALL_INTERFACE:>
     )
-    target_sources(${TARGET} PRIVATE ${CPP_FILE} ${EMBED_BINARY_DIR}/embed_impl.cpp ${EMBED_HPP})
+    target_sources(${TARGET} PRIVATE ${CPP_FILE} ${EMBED_BINARY_DIR}/embed_impl.cpp)
     target_compile_definitions(${TARGET} PRIVATE _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING)
 
     if (NOT B_PRODUCTION_MODE)
@@ -442,7 +427,6 @@ function(b_embed TARGET FILENAME)
         source_group(TREE ${EMBED_BINARY_DIR}/autogen/${TARGET_ID}/include/battery PREFIX "embed/autogen" FILES ${EMBED_HPP})
         source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "/embed" FILES ${FULL_PATH})
     endif()
-
 endfunction()
 
 function(b_embed_proxy_target MAIN_TARGET PROXY_TARGET)
