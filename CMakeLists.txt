@@ -385,10 +385,7 @@ function(b_embed TARGET FILENAME)
     set(EMBED_IDENTIFIERS ${EMBED_IDENTIFIERS} ${IDENTIFIER} CACHE INTERNAL "list of all identifiers used by the embed library" FORCE)
     set(EMBED_FILENAMES ${EMBED_FILENAMES} ${FILENAME} CACHE INTERNAL "list of all filenames used by the embed library" FORCE)
     set(EMBED_TARGETS ${EMBED_TARGETS} ${TARGET} CACHE INTERNAL "list of all targets used by the embed library" FORCE)
-
-    # === ГЕНЕРИРУЕМ embed.hpp СРАЗУ ДЛЯ ЭТОГО ТАРГЕТА ===
-    _embed_generate_hpp(${TARGET})
-
+    
     # === Генерация .cpp файла для встраивания ===
     set(EMBED_HPP "${EMBED_BINARY_DIR}/autogen/${TARGET_ID}/include/battery/embed.hpp")
     set(EMBED_CPP_TEMPLATE "${EMBED_BINARY_DIR}/embed_source_file_template.cpp")
