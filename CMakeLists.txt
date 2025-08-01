@@ -49,6 +49,7 @@ set(EMBED_MASTER_SOURCE_FILE [==[
 #include <mutex>
 #include <unordered_map>
 #include <optional>
+#include <atimic>
 #endif // !B_PRODUCTION_MODE and !B_OS_WEB
 
 namespace b {
@@ -140,7 +141,7 @@ namespace b {
                             continue;
                         }
                         filedata.newContent = *fileresult;
-                        EmbedInternal::EmbeddedFile newFile(filedata.newContent, filedata.filename, filedata.filepath);
+                        EmbedInternal::EmbeddedFile newFile(filedata.newContent.c_str(), filedata.newContent.size(), filedata.filename.c_str(), filedata.filepath.c_str());
                         filedata.callback(newFile);
                     }
                 }
@@ -156,7 +157,8 @@ namespace b {
 #else // B_PRODUCTION_MODE or B_OS_WEB
         auto fileresult = embed_read_file(m_fullFilepath);
         if (fileresult) {
-            m_data = *fileresult;
+            m_storage = std::move(*fileresult);
+            m_data = m_storage.c_str();
         }
         callback(*this);
 
@@ -232,6 +234,7 @@ namespace b {
             size_t m_size = 0;
             const char* m_filename = nullptr;
 #ifndef B_PRODUCTION_MODE
+            std::string m_storage;
             const char* m_fullFilepath = nullptr;
 #endif
         };
@@ -303,32 +306,29 @@ function(_embed_generate_hpp TARGET)
     set(EMBEDDED_FILES_RETURNS "")
     set(EMBEDDED_FILES_LIST "")
 
-    # Проходим по индексам
+    # Iterate over indices
     list(LENGTH EMBED_IDENTIFIERS num_identifiers)
     math(EXPR last_index "${num_identifiers} - 1")
     foreach(INDEX RANGE 0 ${last_index})
         list(GET EMBED_IDENTIFIERS ${INDEX} IDENTIFIER)
         list(GET EMBED_FILENAMES ${INDEX} FILENAME)
         if (IDENTIFIER MATCHES "^${TARGET}_")
-            # Объявление
             set(EMBEDDED_FILES_DECLARATIONS "${EMBEDDED_FILES_DECLARATIONS}static EmbeddedFile ${IDENTIFIER};\n")
 
-            # Возврат в embed<>
             set(EMBEDDED_FILES_RETURNS "${EMBEDDED_FILES_RETURNS}if (identifier == \"${FILENAME}\") { return EmbedInternal::${IDENTIFIER}; }\nelse ")
 
-            # Добавляем в список
             set(EMBEDDED_FILES_LIST "${EMBEDDED_FILES_LIST}    \"${FILENAME}\",\n")
         endif()
     endforeach()
 
-    # Убираем последнюю запятую
+    # Remove the last comma
     string(REGEX REPLACE ",\n$" "" EMBEDDED_FILES_LIST "${EMBEDDED_FILES_LIST}")
 
-    # Генерируем заголовок
+    # Generate the header file
     file(READ ${EMBED_BINARY_DIR}/embed_header_file_template.hpp EMBED_HEADER_FILE)
     string(CONFIGURE "${EMBED_HEADER_FILE}" EMBED_HEADER_FILE_GENERATED)
 
-    # Путь к embed.hpp
+    # Path to embed.hpp
     set(EMBED_HPP "${EMBED_BINARY_DIR}/autogen/${TARGET}/include/battery/embed.hpp")
     get_filename_component(EMBED_HPP_DIR "${EMBED_HPP}" DIRECTORY)
     file(MAKE_DIRECTORY "${EMBED_HPP_DIR}")
@@ -361,15 +361,15 @@ function(b_embed TARGET FILENAME)
     if (NOT EMBED_USED_IDENTIFIERS_INDEX EQUAL -1)
         message(FATAL_ERROR "embed: Identifier already in use: '${IDENTIFIER}'")
     endif()
-    # === Добавляем идентификатор и имя файла ===
+    # === Add identifier and file name ===
     set(EMBED_IDENTIFIERS ${EMBED_IDENTIFIERS} ${IDENTIFIER} CACHE INTERNAL "list of all identifiers used by the embed library" FORCE)
     set(EMBED_FILENAMES ${EMBED_FILENAMES} ${FILENAME} CACHE INTERNAL "list of all filenames used by the embed library" FORCE)
     set(EMBED_TARGETS ${EMBED_TARGETS} ${TARGET} CACHE INTERNAL "list of all targets used by the embed library" FORCE)
     
-    # === ГЕНЕРИРУЕМ embed.hpp СРАЗУ ДЛЯ ЭТОГО ТАРГЕТА ===
+    # === Generate embed.hpp lazy ===
     _embed_generate_hpp(${TARGET})
     
-    # === Генерация .cpp файла для встраивания ===
+    # === Generate .cpp file for embed ===
     set(EMBED_HPP "${EMBED_BINARY_DIR}/autogen/${TARGET_ID}/include/battery/embed.hpp")
     set(EMBED_CPP_TEMPLATE "${EMBED_BINARY_DIR}/embed_source_file_template.cpp")
     add_custom_command(
@@ -385,7 +385,7 @@ function(b_embed TARGET FILENAME)
         VERBATIM
     )
 
-    # === Добавляем файлы в таргет (теперь embed.hpp уже существует!) ===
+    # === Adding files to the target (embed.hpp now already exists!) ===
     target_include_directories(${TARGET} PUBLIC 
         $<BUILD_INTERFACE:${EMBED_BINARY_DIR}/autogen/${TARGET_ID}/include>
         $<INSTALL_INTERFACE:>
