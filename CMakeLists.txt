@@ -314,7 +314,7 @@ function(_embed_generate_hpp TARGET)
             set(EMBEDDED_FILES_DECLARATIONS "${EMBEDDED_FILES_DECLARATIONS}static EmbeddedFile ${IDENTIFIER};\n")
 
             # Возврат в embed<>
-            set(EMBEDDED_FILES_RETURNS "${EMBEDDED_FILES_RETURNS}if constexpr (identifier == \"${FILENAME}\") { return EmbedInternal::${IDENTIFIER}; }\nelse ")
+            set(EMBEDDED_FILES_RETURNS "${EMBEDDED_FILES_RETURNS}if (identifier == \"${FILENAME}\") { return EmbedInternal::${IDENTIFIER}; }\nelse ")
 
             # Добавляем в список
             set(EMBEDDED_FILES_LIST "${EMBEDDED_FILES_LIST}    \"${FILENAME}\",\n")
