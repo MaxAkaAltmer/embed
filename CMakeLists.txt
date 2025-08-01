@@ -186,95 +186,94 @@ set(EMBED_HEADER_FILE [=[
 #define BATTERY_EMBED_HPP
 #include <vector>
 #include <string>
-#include <string_view>
 #include <stdexcept>
 #include <sstream>
 #include <functional>
 #include <cstdint>
 #include <algorithm>
-#ifndef __cpp_constexpr_dynamic_alloc
-#   error "battery::embed requires C++20 (Your compiler does not provide __cpp_constexpr_dynamic_alloc, which is needed for battery::embed)"
+
+// Отключаем проверку C++20 для совместимости
+#if 0
+#   ifndef __cpp_constexpr_dynamic_alloc
+#   error "battery::embed requires C++20 ..."
+#   endif
 #endif
+
 namespace b {
     struct EmbedInternal {
         class EmbeddedFile {
         public:
-            constexpr EmbeddedFile() = default;
-            constexpr EmbeddedFile(
-                    const std::string_view& data,
-                    const std::string_view& filename
+            EmbeddedFile() = default;
+
+            EmbeddedFile(
+                const char* data, size_t size,
+                const char* filename
 #ifndef B_PRODUCTION_MODE
-                    , const std::string_view& fullFilepath
-#endif // !B_PRODUCTION_MODE
+                , const char* fullFilepath
+#endif
             )
                 : m_data(data)
+                , m_size(size)
                 , m_filename(filename)
 #ifndef B_PRODUCTION_MODE
                 , m_fullFilepath(fullFilepath)
-#endif // !B_PRODUCTION_MODE
-            {}
-            [[nodiscard]] std::string str() const {
-                return m_data.data();
-            }
-            [[nodiscard]] const char* data() const {
-                return m_data.data();
-            }
-            [[nodiscard]] std::vector<uint8_t> vec() const {
-                return { m_data.begin(), m_data.end() };
-            }
-            [[nodiscard]] size_t length() const {
-                return m_data.size();
-            }
-            [[nodiscard]] size_t size() const {
-                return m_data.size();
-            }
-            operator std::string() const {
-                return str();
-            }
-            operator std::vector<uint8_t>() const {
-                return vec();
-            }
-            void get(const std::function<void(const b::EmbedInternal::EmbeddedFile&)>& callback);
-        private:
-            std::string_view m_data;
-            std::string_view m_filename;
-#ifndef B_PRODUCTION_MODE
-            std::string_view m_fullFilepath;
 #endif
-        }; // class EmbeddedFile
+            {}
+
+            [[nodiscard]] std::string str() const {
+                return std::string(m_data, m_size);
+            }
+            [[nodiscard]] const char* data() const { return m_data; }
+            [[nodiscard]] std::vector<uint8_t> vec() const {
+                return { reinterpret_cast<const uint8_t*>(m_data), 
+                         reinterpret_cast<const uint8_t*>(m_data) + m_size };
+            }
+            [[nodiscard]] size_t size() const { return m_size; }
+            [[nodiscard]] size_t length() const { return m_size; }
+
+            operator std::string() const { return str(); }
+            operator std::vector<uint8_t>() const { return vec(); }
+
+            void get(const std::function<void(const b::EmbedInternal::EmbeddedFile&)>& callback);
+
+        private:
+            const char* m_data = nullptr;
+            size_t m_size = 0;
+            const char* m_filename = nullptr;
+#ifndef B_PRODUCTION_MODE
+            const char* m_fullFilepath = nullptr;
+#endif
+        };
+
         ${EMBEDDED_FILES_DECLARATIONS}
-    };   // struct embedded_files
+    };
 
     template<size_t N>
     struct embed_string_literal {
-        constexpr embed_string_literal(const char (&str)[N]) {
+        embed_string_literal(const char (&str)[N]) {
             std::copy_n(str, N, value);
         }
-        constexpr bool operator!=(const embed_string_literal& other) const {
-            return std::equal(value, value + N, other.value);
+        bool operator!=(const embed_string_literal& other) const {
+            return !std::equal(value, value + N, other.value);
         }
-        [[nodiscard]] std::string str() const {
-            return std::string(value, N);
-        }
-        [[nodiscard]] constexpr bool _false() const {
+        [[nodiscard]] bool _false() const {
             return false;
         }
         char value[N];
     };
 
     template<size_t N, size_t M>
-    constexpr bool operator==(const embed_string_literal<N>& left, const char (&right)[M]) {
+    bool operator==(const embed_string_literal<N>& left, const char (&right)[M]) {
         return std::equal(left.value, left.value + N, right);
     }
 
     template<embed_string_literal identifier>
-    constexpr EmbedInternal::EmbeddedFile embed() {
-        ${EMBEDDED_FILES_RETURNS}{
-            static_assert(identifier._false(), "[b::embed<>] No such file or directory");
-        }
+    EmbedInternal::EmbeddedFile embed() {
+        ${EMBEDDED_FILES_RETURNS}
+        throw std::runtime_error("[b::embed<>] No such file or directory");
     }
 
-    // === НОВАЯ ФУНКЦИЯ: Получить список всех встроенных файлов ===
+    // Функция для получения списка всех встроенных файлов
     [[nodiscard]] inline std::vector<std::string> embed_list() {
         return {
             ${EMBEDDED_FILES_LIST}
