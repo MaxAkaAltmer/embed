@@ -65,7 +65,7 @@ Currently, every file would need to be retrieved and written to disk manually.
 ## Requirements
 
  - CMake >=3.21
- - A C++20 compiler
+ - A C++17 compiler
 
 This project requires C++20. If you are stuck with an older version, you can use [Release v1.0.0](https://github.com/batterycenter/embed/releases/tag/v1.0.0). It was made for C++14.
 
