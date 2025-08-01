@@ -22,10 +22,8 @@ set(EMBED_SOURCE_FILE_TEMPLATE [==[
 namespace b {
 
     EmbedInternal::EmbeddedFile EmbedInternal::${IDENTIFIER} = {
-        std::string_view(
             ${GENERATED_BYTE_ARRAY},
             ${FILESIZE}
-        )
         , "${FILENAME}"
 #ifndef B_PRODUCTION_MODE
         , "${FULL_PATH}"
@@ -260,8 +258,8 @@ namespace b {
         return std::equal(left.value, left.value + N, right);
     }
 
-    template<embed_string_literal identifier>
-    EmbedInternal::EmbeddedFile embed() {
+    template<size_t N>
+    EmbedInternal::EmbeddedFile embed(const embed_string_literal<N>& identifier) {
         ${EMBEDDED_FILES_RETURNS}
         throw std::runtime_error("[b::embed<>] No such file or directory");
     }
