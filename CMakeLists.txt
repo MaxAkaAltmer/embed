@@ -238,28 +238,9 @@ namespace b {
 
         ${EMBEDDED_FILES_DECLARATIONS}
     };
-
-    template<size_t N>
-    struct embed_string_literal {
-        embed_string_literal(const char (&str)[N]) {
-            std::copy_n(str, N, value);
-        }
-        bool operator!=(const embed_string_literal& other) const {
-            return !std::equal(value, value + N, other.value);
-        }
-        [[nodiscard]] bool _false() const {
-            return false;
-        }
-        char value[N];
-    };
-
-    template<size_t N, size_t M>
-    bool operator==(const embed_string_literal<N>& left, const char (&right)[M]) {
-        return std::equal(left.value, left.value + N, right);
-    }
-
-    template<size_t N>
-    EmbedInternal::EmbeddedFile embed(const embed_string_literal<N>& identifier) {
+    
+    template<class S>
+    EmbedInternal::EmbeddedFile embed(const S& identifier) {
         ${EMBEDDED_FILES_RETURNS}
         throw std::runtime_error("[b::embed<>] No such file or directory");
     }
