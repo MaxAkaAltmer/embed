@@ -304,7 +304,7 @@ set(EMBED_FILENAMES "" CACHE INTERNAL "list of all filenames used by battery::em
 set(EMBED_TARGETS "" CACHE INTERNAL "list of all targets used by battery::embed")
 
 # Defer the function call until the end of the configure step
-# cmake_language(DEFER DIRECTORY ${CMAKE_SOURCE_DIR} CALL _embed_generate_all_hpps())
+cmake_language(DEFER DIRECTORY ${CMAKE_SOURCE_DIR} CALL _embed_generate_all_hpps())
 function(_embed_generate_all_hpps)
     message(STATUS "Generating b::embed() HPP files ...")
     foreach (TARGET ${EMBED_TARGETS})
@@ -387,7 +387,7 @@ function(b_embed TARGET FILENAME)
     set(EMBED_TARGETS ${EMBED_TARGETS} ${TARGET} CACHE INTERNAL "list of all targets used by the embed library" FORCE)
 
     # === ГЕНЕРИРУЕМ embed.hpp СРАЗУ ДЛЯ ЭТОГО ТАРГЕТА ===
-    # _embed_generate_hpp(${TARGET})
+    _embed_generate_hpp(${TARGET})
 
     # === Генерация .cpp файла для встраивания ===
     set(EMBED_HPP "${EMBED_BINARY_DIR}/autogen/${TARGET_ID}/include/battery/embed.hpp")
