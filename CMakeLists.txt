@@ -49,7 +49,7 @@ set(EMBED_MASTER_SOURCE_FILE [==[
 #include <mutex>
 #include <unordered_map>
 #include <optional>
-#include <atimic>
+#include <atomic>
 #endif // !B_PRODUCTION_MODE and !B_OS_WEB
 
 namespace b {
