@@ -274,24 +274,17 @@ file(READ "${FULL_PATH}" HEX_DATA HEX)
 string(LENGTH "${HEX_DATA}" HEX_LENGTH)
 math(EXPR BYTE_COUNT "${HEX_LENGTH} / 2")
 
-# Формируем массив 0x__, 0x__, ...
-set(GENERATED_BYTE_ARRAY "")
-foreach(BYTE_INDEX RANGE 0 ${BYTE_COUNT})
-    math(EXPR START_OFFSET "${BYTE_INDEX} * 2")
-    if(START_OFFSET LESS HEX_LENGTH)
-        string(SUBSTRING "${HEX_DATA}" ${START_OFFSET} 2 BYTE)
-        if(GENERATED_BYTE_ARRAY)
-            set(GENERATED_BYTE_ARRAY "${GENERATED_BYTE_ARRAY}, 0x${BYTE}")
-        else()
-            set(GENERATED_BYTE_ARRAY "0x${BYTE}")
-        endif()
-    endif()
-endforeach()
+# Преобразуем hex-строку в массив 0x__, 0x__, ...
+set(GENERATED_BYTE_ARRAY "${HEX_DATA}")
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1" GENERATED_BYTE_ARRAY "${GENERATED_BYTE_ARRAY}")
+string(REGEX REPLACE "(0x[0-9a-f][0-9a-f])(?=0x)" "\\1, " GENERATED_BYTE_ARRAY "${GENERATED_BYTE_ARRAY}")
 
-# Размер файла в байтах
+# Убедимся, что нет лишних пробелов
+string(STRIP "${GENERATED_BYTE_ARRAY}" GENERATED_BYTE_ARRAY)
+
+# Размер
 math(EXPR FILESIZE "${BYTE_COUNT}")
 
-# Теперь configure_file подставит GENERATED_BYTE_ARRAY как массив
 configure_file(${INFILE} ${OUTFILE})
 ]=])
 
