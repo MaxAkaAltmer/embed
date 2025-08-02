@@ -20,9 +20,11 @@ set(EMBED_SOURCE_FILE_TEMPLATE [==[
 #include "battery/embed.hpp"
 
 namespace b {
-
+    const unsigned char ${IDENTIFIER}_data[] = {
+        ${GENERATED_BYTE_ARRAY}
+    };
     EmbedInternal::EmbeddedFile EmbedInternal::${IDENTIFIER} = {
-            ${GENERATED_BYTE_ARRAY},
+            ${IDENTIFIER}_data,
             ${FILESIZE}
         , "${FILENAME}"
 #ifndef B_PRODUCTION_MODE
@@ -158,7 +160,8 @@ namespace b {
         auto fileresult = embed_read_file(m_fullFilepath);
         if (fileresult) {
             m_storage = std::move(*fileresult);
-            m_data = m_storage.c_str();
+            m_data = reinterpret_cast<const unsigned char*>(m_storage.c_str());
+            m_size = m_storage.size();
         }
         callback(*this);
 
@@ -199,7 +202,7 @@ namespace b {
             EmbeddedFile() = default;
 
             EmbeddedFile(
-                const char* data, size_t size,
+                const unsigned char* data, size_t size,
                 const char* filename
 #ifndef B_PRODUCTION_MODE
                 , const char* fullFilepath
@@ -214,12 +217,11 @@ namespace b {
             {}
 
             [[nodiscard]] std::string str() const {
-                return std::string(m_data, m_size);
+                return std::string(reinterpret_cast<const char*>(m_data), m_size);
             }
-            [[nodiscard]] const char* data() const { return m_data; }
+            [[nodiscard]] const unsigned char* data() const { return m_data; }
             [[nodiscard]] std::vector<uint8_t> vec() const {
-                return { reinterpret_cast<const uint8_t*>(m_data), 
-                         reinterpret_cast<const uint8_t*>(m_data) + m_size };
+                return { m_data, m_data + m_size };
             }
             [[nodiscard]] size_t size() const { return m_size; }
             [[nodiscard]] size_t length() const { return m_size; }
@@ -230,7 +232,7 @@ namespace b {
             void get(const std::function<void(const b::EmbedInternal::EmbeddedFile&)>& callback);
 
         private:
-            const char* m_data = nullptr;
+            const unsigned char* m_data = nullptr;
             size_t m_size = 0;
             const char* m_filename = nullptr;
 #ifndef B_PRODUCTION_MODE
@@ -268,17 +270,31 @@ file(WRITE ${EMBED_BINARY_DIR}/embed_header_file_template.hpp "${EMBED_HEADER_FI
 
 # The cmake script to embed the files. This is called later on-demand, in a separate process
 set(EMBED_GENERATE_SCRIPT [=[
-file(READ "${FULL_PATH}" GENERATED_BYTE_ARRAY HEX)
-string(LENGTH "${GENERATED_BYTE_ARRAY}" FILESIZE)
-math(EXPR FILESIZE "${FILESIZE} / 2")
+file(READ "${FULL_PATH}" HEX_DATA HEX)
+string(LENGTH "${HEX_DATA}" HEX_LENGTH)
+math(EXPR BYTE_COUNT "${HEX_LENGTH} / 2")
 
-string(REPEAT "[0-9a-f]" 32 PATTERN)
-set(GENERATED_BYTE_ARRAY "\"${GENERATED_BYTE_ARRAY}")
-string(REGEX REPLACE "${PATTERN}" "\\0\"\n            \"" GENERATED_BYTE_ARRAY ${GENERATED_BYTE_ARRAY})
-string(REGEX REPLACE "([0-9a-f][0-9a-f])" "\\\\x\\1" GENERATED_BYTE_ARRAY ${GENERATED_BYTE_ARRAY})
-set(GENERATED_BYTE_ARRAY "${GENERATED_BYTE_ARRAY}\"")
+# Формируем массив 0x__, 0x__, ...
+set(GENERATED_BYTE_ARRAY "")
+foreach(BYTE_INDEX RANGE 0 ${BYTE_COUNT})
+    math(EXPR START_OFFSET "${BYTE_INDEX} * 2")
+    if(START_OFFSET LESS HEX_LENGTH)
+        string(SUBSTRING "${HEX_DATA}" ${START_OFFSET} 2 BYTE)
+        if(GENERATED_BYTE_ARRAY)
+            set(GENERATED_BYTE_ARRAY "${GENERATED_BYTE_ARRAY}, 0x${BYTE}")
+        else()
+            set(GENERATED_BYTE_ARRAY "0x${BYTE}")
+        endif()
+    endif()
+endforeach()
+
+# Размер файла в байтах
+math(EXPR FILESIZE "${BYTE_COUNT}")
+
+# Теперь configure_file подставит GENERATED_BYTE_ARRAY как массив
 configure_file(${INFILE} ${OUTFILE})
 ]=])
+
 file(WRITE ${EMBED_BINARY_DIR}/generate.cmake ${EMBED_GENERATE_SCRIPT})
 
 set(EMBED_IDENTIFIERS "" CACHE INTERNAL "list of all identifiers used by battery::embed")
