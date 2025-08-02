@@ -274,15 +274,19 @@ file(READ "${FULL_PATH}" HEX_DATA HEX)
 string(LENGTH "${HEX_DATA}" HEX_LENGTH)
 math(EXPR BYTE_COUNT "${HEX_LENGTH} / 2")
 
-# Преобразуем hex-строку в массив 0x__, 0x__, ...
+# Преобразуем hex-строку: 48656c6c6f → 0x48, 0x65, 0x6c, 0x6c, 0x6f
 set(GENERATED_BYTE_ARRAY "${HEX_DATA}")
+
+# Шаг 1: добавляем 0x перед каждой парой
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1" GENERATED_BYTE_ARRAY "${GENERATED_BYTE_ARRAY}")
-string(REGEX REPLACE "(0x[0-9a-f][0-9a-f])(?=0x)" "\\1, " GENERATED_BYTE_ARRAY "${GENERATED_BYTE_ARRAY}")
 
-# Убедимся, что нет лишних пробелов
-string(STRIP "${GENERATED_BYTE_ARRAY}" GENERATED_BYTE_ARRAY)
+# Шаг 2: добавляем запятую и пробел после каждого байта
+string(REGEX REPLACE "(0x[0-9a-f][0-9a-f])" "\\1, " GENERATED_BYTE_ARRAY "${GENERATED_BYTE_ARRAY}")
 
-# Размер
+# Шаг 3: удаляем лишнюю запятую и пробел в конце
+string(REGEX REPLACE ", $" "" GENERATED_BYTE_ARRAY "${GENERATED_BYTE_ARRAY}")
+
+# Устанавливаем размер
 math(EXPR FILESIZE "${BYTE_COUNT}")
 
 configure_file(${INFILE} ${OUTFILE})
