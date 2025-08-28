@@ -414,11 +414,26 @@ function(b_embed TARGET FILENAME)
     endif ()
 
     if (MSVC)
+        # target_sources(${TARGET} PRIVATE ${FULL_PATH})
+        # source_group(TREE ${EMBED_BINARY_DIR}/autogen/${TARGET_ID}/src PREFIX "embed/autogen" FILES ${CPP_FILE})
+        # source_group(TREE ${EMBED_BINARY_DIR} PREFIX "embed/autogen" FILES ${EMBED_BINARY_DIR}/embed_impl.cpp)
+        # source_group(TREE ${EMBED_BINARY_DIR}/autogen/${TARGET_ID}/include/battery PREFIX "embed/autogen" FILES ${EMBED_HPP})
+        # source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "/embed" FILES ${FULL_PATH})
+
         target_sources(${TARGET} PRIVATE ${FULL_PATH})
+        set_source_files_properties(${FULL_PATH} PROPERTIES HEADER_FILE_ONLY TRUE)
+    
         source_group(TREE ${EMBED_BINARY_DIR}/autogen/${TARGET_ID}/src PREFIX "embed/autogen" FILES ${CPP_FILE})
         source_group(TREE ${EMBED_BINARY_DIR} PREFIX "embed/autogen" FILES ${EMBED_BINARY_DIR}/embed_impl.cpp)
         source_group(TREE ${EMBED_BINARY_DIR}/autogen/${TARGET_ID}/include/battery PREFIX "embed/autogen" FILES ${EMBED_HPP})
-        source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "/embed" FILES ${FULL_PATH})
+    
+        cmake_path(IS_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}" "${FULL_PATH}" NORMALIZE IS_SUBPATH)
+        if (IS_SUBPATH)
+            source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" PREFIX "embed" FILES ${FULL_PATH})
+        else()
+            source_group("embed" FILES ${FULL_PATH})
+        endif()
+        
     endif()
 endfunction()
 
