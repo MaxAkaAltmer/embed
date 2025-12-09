@@ -250,6 +250,11 @@ namespace b {
         throw std::runtime_error("[b::embed<>] No such file or directory");
     }
 
+    EmbedInternal::EmbeddedFile embed(const char* identifier) {
+        ${EMBEDDED_FILES_RET_CHARP}
+        throw std::runtime_error("[b::embed<>] No such file or directory");
+    }
+
     // Функция для получения списка всех встроенных файлов
     [[nodiscard]] inline std::vector<std::string> embed_list() {
         return {
@@ -317,6 +322,7 @@ function(_embed_generate_hpp TARGET)
 
     set(EMBEDDED_FILES_DECLARATIONS "")
     set(EMBEDDED_FILES_RETURNS "")
+    set(EMBEDDED_FILES_RET_CHARP "")
     set(EMBEDDED_FILES_LIST "")
 
     # Iterate over indices
@@ -330,6 +336,8 @@ function(_embed_generate_hpp TARGET)
 
             set(EMBEDDED_FILES_RETURNS "${EMBEDDED_FILES_RETURNS}if (identifier == \"${FILENAME}\") { return EmbedInternal::${IDENTIFIER}; }\nelse ")
 
+            set(EMBEDDED_FILES_RET_CHARP "${EMBEDDED_FILES_RET_CHARP}if (identifier == std::string(\"${FILENAME}\")) { return EmbedInternal::${IDENTIFIER}; }\nelse ")
+            
             set(EMBEDDED_FILES_LIST "${EMBEDDED_FILES_LIST}    \"${FILENAME}\",\n")
         endif()
     endforeach()
