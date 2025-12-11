@@ -250,7 +250,7 @@ namespace b {
         throw std::runtime_error("[b::embed<>] No such file or directory");
     }
 
-    EmbedInternal::EmbeddedFile embed(const char* identifier) {
+    inline EmbedInternal::EmbeddedFile embed(const char* identifier) {
         ${EMBEDDED_FILES_RET_CHARP}
         throw std::runtime_error("[b::embed<>] No such file or directory");
     }
